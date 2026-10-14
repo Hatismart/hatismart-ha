@@ -32,6 +32,12 @@ FRIGATE_RULES = [
     ("GET", re.compile(r"^/api/events$"), False),
     ("GET", re.compile(r"^/api/events/[\w.-]+/(snapshot\.jpg|thumbnail\.(jpg|webp)|clip\.mp4)$"), False),
     ("GET", re.compile(r"^/api/review$"), False),
+    ("GET", re.compile(r"^/api/events/[\w.-]+/thumbnail\.jpg$"), False),
+    ("GET", re.compile(r"^/api/[\w-]+/recordings$"), False),
+    ("GET", re.compile(r"^/api/[\w-]+/recordings/summary$"), False),
+    ("GET", re.compile(r"^/api/review/summary$"), False),
+    ("GET", re.compile(r"^/vod/[\w-]+/start/[\d.]+/end/[\d.]+/[\w./-]+$"), False),
+    ("GET", re.compile(r"^/vod/event/[\w.-]+/[\w./-]+$"), False),
     ("PUT", re.compile(r"^/api/config/set$"), True),
     ("POST", re.compile(r"^/api/restart$"), True),
 ]
@@ -226,9 +232,9 @@ class FrigateSetupView(HomeAssistantView):
         try:
             async with d.session().get(url + "/api/config", headers=headers, timeout=ClientTimeout(total=6)) as r:
                 if r.status == 401:
-                    return self.json({"error": "login_failed", "message": "Sai tài khoản Frigate"}, status_code=400)
+                    return self.json({"error": "login_failed", "message": "Sai tài khoản máy chủ AI"}, status_code=400)
                 if r.status != 200:
-                    return self.json({"error": "bad_response", "message": "Địa chỉ này không phải Frigate"}, status_code=400)
+                    return self.json({"error": "bad_response", "message": "Địa chỉ này không phải máy chủ Hatismart AI"}, status_code=400)
         except Exception:  # noqa: BLE001
             return self.json({"error": "unreachable", "message": "Không kết nối được địa chỉ này"}, status_code=400)
         d.config["frigate"] = f
@@ -259,19 +265,30 @@ class FrigateProxyView(HomeAssistantView):
         headers = await d.frigate_headers()
         if body:
             headers["Content-Type"] = request.headers.get("Content-Type", "application/json")
+        if "Range" in request.headers:
+            headers["Range"] = request.headers["Range"]   # trình phát video cần tua theo byte
         try:
-            async with d.session().request(
+            r = await d.session().request(
                 request.method, d.frigate["url"] + sub, params=request.query, data=body,
-                headers=headers, timeout=ClientTimeout(total=60),
-            ) as r:
-                if r.status == 401 and d.frigate.get("username"):
-                    d.cookie = None
-                content = await r.read()
-                return web.Response(body=content, status=r.status,
-                                    content_type=(r.content_type or "application/octet-stream"),
-                                    headers={"Cache-Control": "no-store"})
+                headers=headers, timeout=ClientTimeout(total=None, sock_connect=10, sock_read=60),
+            )
         except Exception:  # noqa: BLE001
-            return self.json({"error": "satellite_unreachable", "message": "Không kết nối được máy Frigate"}, status_code=502)
+            return self.json({"error": "satellite_unreachable", "message": "Không kết nối được máy chủ AI"}, status_code=502)
+        try:
+            if r.status == 401 and d.frigate.get("username"):
+                d.cookie = None
+            out_headers = {"Cache-Control": "no-store"}
+            for h in ("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges"):
+                if h in r.headers:
+                    out_headers[h] = r.headers[h]
+            resp = web.StreamResponse(status=r.status, headers=out_headers)
+            await resp.prepare(request)
+            async for chunk in r.content.iter_chunked(64 * 1024):
+                await resp.write(chunk)
+            await resp.write_eof()
+            return resp
+        finally:
+            r.release()
 
     async def get(self, request, path):
         return await self._handle(request, path)
