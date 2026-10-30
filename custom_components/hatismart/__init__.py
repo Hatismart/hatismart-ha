@@ -1,4 +1,4 @@
-"""Hatismart — cầu nối giữa app Hatismart Pro và các vệ tinh trong LAN (Frigate…).
+"""Hatismart — cầu nối giữa app Hatismart Pro và các vệ tinh trong LAN (Frigate, go2rtc…).
 
 Mọi API nằm dưới /api/hatismart/..., dùng xác thực sẵn có của Home Assistant
 (token của app). Lệnh sửa cấu hình chỉ dành cho admin.
@@ -19,6 +19,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 
+from . import go2rtc
 from .const import DOMAIN, STORAGE_KEY, VERSION
 
 _LOGGER = logging.getLogger(__name__)
@@ -103,11 +104,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     data = HatismartData(hass)
     await data.load()
     hass.data[DOMAIN] = data
+    hass.async_create_task(go2rtc.auto_setup(data))
     if not hass.data.get(f"{DOMAIN}_views"):
         hass.http.register_view(InfoView())
         hass.http.register_view(FrigateScanView())
         hass.http.register_view(FrigateSetupView())
         hass.http.register_view(FrigateProxyView())
+        for view in go2rtc.VIEWS:
+            hass.http.register_view(view())
         hass.data[f"{DOMAIN}_views"] = True
     return True
 
@@ -133,10 +137,11 @@ class InfoView(HomeAssistantView):
         out = {
             "version": VERSION,
             "user": {"name": user.name if user else "", "is_admin": _is_admin(request)},
-            "services": {"frigate": bool(d.frigate.get("url"))},
+            "services": {"frigate": bool(d.frigate.get("url")), "go2rtc": bool((d.config.get("go2rtc") or {}).get("url"))},
         }
         if _is_admin(request):
             out["frigate_url"] = d.frigate.get("url", "")
+            out["go2rtc_url"] = (d.config.get("go2rtc") or {}).get("url", "")
         return self.json(out)
 
 
