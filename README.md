@@ -3,6 +3,20 @@
 Cầu nối giữa app **Hatismart Pro** và các thiết bị vệ tinh trong mạng nội bộ: Frigate (camera AI) và go2rtc (camera thường).
 API nằm dưới `/api/hatismart/...`, dùng xác thực sẵn có của Home Assistant — không mở thêm cổng.
 
+## Cài cho máy khách (HA chạy Docker / Portainer) — một lệnh
+Chạy trên máy chủ (root, hoặc tài khoản trong nhóm docker):
+```bash
+wget -qO- https://raw.githubusercontent.com/Hatismart/hatismart-ha/main/cai-dat.sh | sh
+```
+Script tự làm: tạo container **go2rtc** nếu chưa có (mạng host, `/opt/go2rtc`, tài khoản API ngẫu nhiên in ở cuối),
+cài/cập nhật bộ cầu (bản cũ sao lưu ở `/config/hatismart-backup`), thêm `go2rtc: url: http://127.0.0.1:1984` vào
+`configuration.yaml` (sao lưu `.bak-hatismart`), khởi động lại HA. Chạy lại lần nữa = cập nhật.
+
+- Lần đầu: HA → Settings → Devices & services → Add integration → **Hatismart** (hoặc thêm `HA_TOKEN=<token quản trị>`
+  trước `sh` để script tự thêm và kiểm tra).
+- Máy có nhiều container HA: `... | HA_CONTAINER=ten sh`. Chỉ kiểm tra, không đổi gì: `... | DRY_RUN=1 sh`.
+- Sau đó: app Hatismart Pro → tab **Camera** → **+** → chạm camera tìm thấy → nhập mật khẩu camera.
+
 ## Cài đặt
 
 ### Cách 1 — HACS (khuyên dùng)
