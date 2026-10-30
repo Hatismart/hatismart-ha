@@ -39,6 +39,15 @@ FRIGATE_RULES = [
     ("GET", re.compile(r"^/api/review/summary$"), False),
     ("GET", re.compile(r"^/vod/[\w-]+/start/[\d.]+/end/[\d.]+/[\w./-]+$"), False),
     ("GET", re.compile(r"^/vod/event/[\w.-]+/[\w./-]+$"), False),
+    # Khuôn mặt (Frigate ≥ 0.16): xem danh sách/ảnh cho mọi người, dạy/sửa/xoá chỉ quản trị
+    ("GET", re.compile(r"^/api/faces$"), False),
+    ("GET", re.compile(r"^/clips/faces/[\w-]+/[\w.-]+\.(webp|jpg|jpeg|png)$"), False),
+    ("POST", re.compile(r"^/api/faces/[\w-]+/create$"), True),
+    ("POST", re.compile(r"^/api/faces/[\w-]+/register$"), True),
+    ("POST", re.compile(r"^/api/faces/train/[\w-]+/classify$"), True),
+    ("POST", re.compile(r"^/api/faces/[\w-]+/delete$"), True),
+    ("PUT", re.compile(r"^/api/faces/[\w-]+/rename$"), True),
+    ("POST", re.compile(r"^/api/faces/reprocess$"), True),
     ("PUT", re.compile(r"^/api/config/set$"), True),
     ("POST", re.compile(r"^/api/restart$"), True),
 ]
