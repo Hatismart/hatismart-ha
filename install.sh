@@ -1,12 +1,14 @@
 #!/bin/sh
 # Cài/cập nhật tích hợp Hatismart. Chạy trong thư mục cấu hình HA hoặc truyền đường dẫn:
 #   sh install.sh /duong/dan/config
+# Bản thử ở nhánh khác: HATISMART_REF=ten-nhanh sh install.sh
 set -e
 REPO="${HATISMART_REPO:-Hatismart/hatismart-ha}"
+REF="${HATISMART_REF:-main}"
 CFG="${1:-/config}"
 TMP="$(mktemp -d)"
-echo "Tải Hatismart từ github.com/$REPO …"
-URL="https://api.github.com/repos/$REPO/zipball/main"
+echo "Tải Hatismart từ github.com/$REPO ($REF) …"
+URL="https://api.github.com/repos/$REPO/zipball/$REF"
 if [ -n "$GITHUB_TOKEN" ]; then
   # repo private: dùng token chỉ-đọc (fine-grained, quyền Contents: Read)
   curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -o "$TMP/h.zip" "$URL" || wget -qO "$TMP/h.zip" --header="Authorization: Bearer $GITHUB_TOKEN" "$URL"
