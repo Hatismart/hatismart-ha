@@ -21,13 +21,14 @@ PREFIX = "frigate"
 
 
 def _broker(hass: HomeAssistant) -> dict | None:
-    entries = hass.config_entries.async_entries("mqtt")
-    if not entries:
-        return None
-    data = {**entries[0].data, **entries[0].options}
-    if not data.get("broker"):
-        return None
-    return data
+    # bỏ mục "đã bỏ qua" (source=ignore) và mục tắt: chúng không có broker
+    for e in hass.config_entries.async_entries("mqtt"):
+        if e.source == "ignore" or e.disabled_by:
+            continue
+        data = {**e.data, **e.options}
+        if data.get("broker"):
+            return data
+    return None
 
 
 async def _broker_host_for(hass: HomeAssistant, broker: str, frigate_host: str) -> str:
