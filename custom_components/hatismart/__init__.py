@@ -19,7 +19,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 
-from . import go2rtc
+from . import go2rtc, mqtt_link
 from .const import DOMAIN, STORAGE_KEY, VERSION
 
 _LOGGER = logging.getLogger(__name__)
@@ -121,6 +121,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.http.register_view(FrigateScanView())
         hass.http.register_view(FrigateSetupView())
         hass.http.register_view(FrigateProxyView())
+        hass.http.register_view(mqtt_link.FrigateMqttView())
         for view in go2rtc.VIEWS:
             hass.http.register_view(view())
         hass.data[f"{DOMAIN}_views"] = True
