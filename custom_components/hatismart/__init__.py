@@ -37,6 +37,7 @@ FRIGATE_RULES = [
     ("GET", re.compile(r"^/api/[\w-]+/recordings$"), False),
     ("GET", re.compile(r"^/api/[\w-]+/recordings/summary$"), False),
     ("GET", re.compile(r"^/api/review/summary$"), False),
+    ("GET", re.compile(r"^/api/recordings/storage$"), False),
     ("GET", re.compile(r"^/vod/[\w-]+/start/[\d.]+/end/[\d.]+/[\w./-]+$"), False),
     ("GET", re.compile(r"^/vod/event/[\w.-]+/[\w./-]+$"), False),
     # Khuôn mặt (Frigate ≥ 0.16): xem danh sách/ảnh cho mọi người, dạy/sửa/xoá chỉ quản trị
