@@ -49,6 +49,8 @@ FRIGATE_RULES = [
     ("PUT", re.compile(r"^/api/faces/[\w-]+/rename$"), True),
     ("POST", re.compile(r"^/api/faces/reprocess$"), True),
     ("PUT", re.compile(r"^/api/config/set$"), True),
+    # Thử luồng camera trước khi thêm vào máy AI (chỉ nhận đường rtsp://, kiểm ở _handle)
+    ("GET", re.compile(r"^/api/ffprobe$"), True),
     ("POST", re.compile(r"^/api/restart$"), True),
 ]
 
@@ -258,6 +260,17 @@ class FrigateSetupView(HomeAssistantView):
         return self.json({"ok": True, "url": url})
 
 
+def _scrub(v):
+    """Che mật khẩu trong cấu hình Frigate cho người không phải quản trị (đường camera, MQTT…)."""
+    if isinstance(v, dict):
+        return {k: ("***" if k in ("password", "pass") and v[k] else _scrub(x)) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_scrub(x) for x in v]
+    if isinstance(v, str) and "://" in v and "@" in v:
+        return go2rtc.mask(v)
+    return v
+
+
 # ---------- Chuyển tiếp tới Frigate ----------
 class FrigateProxyView(HomeAssistantView):
     url = "/api/hatismart/frigate/{path:.*}"
@@ -273,8 +286,13 @@ class FrigateProxyView(HomeAssistantView):
             return self.json({"error": "not_allowed"}, status_code=403)
         if rule[2] and not _is_admin(request):
             return self.json({"error": "admin_only"}, status_code=403)
+        if sub == "/api/ffprobe":
+            paths = request.query.get("paths", "")
+            if not paths or not all(re.match(r"^rtsps?://", x.strip()) for x in paths.split(",")):
+                return self.json({"error": "bad_path", "message": "Chỉ thử được đường rtsp://"}, status_code=400)
         if request.method != "GET":
             _LOGGER.info("%s %s frigate%s", _user_name(request), request.method, sub)
+        scrub = sub == "/api/config" and not _is_admin(request)
         body = await request.read() if request.method != "GET" else None
         headers = await d.frigate_headers()
         if body:
@@ -291,6 +309,8 @@ class FrigateProxyView(HomeAssistantView):
         try:
             if r.status == 401 and d.frigate.get("username"):
                 d.cookie = None
+            if scrub and r.status == 200:
+                return self.json(_scrub(await r.json(content_type=None)))
             out_headers = {"Cache-Control": "no-store"}
             for h in ("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges"):
                 if h in r.headers:
