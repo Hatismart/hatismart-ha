@@ -121,7 +121,7 @@ class FrigateMqttView(HomeAssistantView):
             return self.json({"error": "not_configured"}, status_code=404)
         b = _broker(hass)
         if b is None:
-            return self.json({"error": "no_mqtt", "message": "Máy chủ chưa có MQTT. Cài broker MQTT và thêm tích hợp MQTT trước."},
+            return self.json({"error": "no_mqtt", "message": "Máy chủ chưa bật dịch vụ sự kiện. Báo kỹ thuật Hatismart."},
                              status_code=400)
         host = await _broker_host_for(hass, str(b["broker"]), urlparse(d.frigate["url"]).hostname or "")
         mqtt_cfg = {"enabled": True, "host": host, "port": int(b.get("port") or 1883),

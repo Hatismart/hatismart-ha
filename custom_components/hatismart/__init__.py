@@ -244,16 +244,29 @@ class FrigateSetupView(HomeAssistantView):
             url = "http://" + url
         if not re.search(r":\d+$", url):
             url += ":5000"
-        f = {"url": url, "username": str(body.get("username") or ""), "password": str(body.get("password") or "")}
-        headers = await d.frigate_headers(f)
-        try:
-            async with d.session().get(url + "/api/config", headers=headers, timeout=ClientTimeout(total=6)) as r:
-                if r.status == 401:
-                    return self.json({"error": "login_failed", "message": "Sai tài khoản máy chủ AI"}, status_code=400)
-                if r.status != 200:
-                    return self.json({"error": "bad_response", "message": "Địa chỉ này không phải máy chủ Hatismart AI"}, status_code=400)
-        except Exception:  # noqa: BLE001
-            return self.json({"error": "unreachable", "message": "Không kết nối được địa chỉ này"}, status_code=400)
+        user, pw = str(body.get("username") or ""), str(body.get("password") or "")
+        # Chỉ có mã kích hoạt (không tên đăng nhập) → tài khoản "hatismart" in trên tem, rồi "admin"; thử cả mã viết hoa
+        users = [user] if user else (["hatismart", "admin"] if pw else [""])
+        pws = list(dict.fromkeys([pw, pw.strip().upper()])) if pw else [""]
+        f = None
+        for u in users:
+            for p in pws:
+                cand = {"url": url, "username": u, "password": p}
+                try:
+                    async with d.session().get(url + "/api/config", headers=await d.frigate_headers(cand),
+                                               timeout=ClientTimeout(total=6)) as r:
+                        if r.status == 200:
+                            f = cand
+                            break
+                        if r.status != 401:
+                            return self.json({"error": "bad_response", "message": "Địa chỉ này không phải máy Hatismart AI"}, status_code=400)
+                except Exception:  # noqa: BLE001
+                    return self.json({"error": "unreachable", "message": "Không kết nối được địa chỉ này"}, status_code=400)
+            if f:
+                break
+        if f is None:
+            return self.json({"error": "login_failed", "message": "Sai mã kích hoạt" if pw else "Máy AI này cần mã kích hoạt"},
+                             status_code=400)
         d.config["frigate"] = f
         d.cookie = None
         await d.save()
