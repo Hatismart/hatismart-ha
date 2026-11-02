@@ -19,7 +19,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 
-from . import go2rtc, mqtt_link, snapshot
+from . import go2rtc, mqtt_link, notify_log, snapshot
 from .const import DOMAIN, STORAGE_KEY, VERSION
 
 _LOGGER = logging.getLogger(__name__)
@@ -118,6 +118,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN] = data
     hass.async_create_task(go2rtc.auto_setup(data))
     await snapshot.async_setup(hass)
+    await notify_log.async_setup(hass)
     if not hass.data.get(f"{DOMAIN}_views"):
         hass.http.register_view(InfoView())
         hass.http.register_view(FrigateScanView())
@@ -125,6 +126,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.http.register_view(FrigateProxyView())
         hass.http.register_view(mqtt_link.FrigateMqttView())
         hass.http.register_view(snapshot.SnapshotView())
+        hass.http.register_view(notify_log.NotificationsView())
+        hass.http.register_view(notify_log.NotificationImageView())
         for view in go2rtc.VIEWS:
             hass.http.register_view(view())
         hass.data[f"{DOMAIN}_views"] = True
@@ -134,6 +137,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.pop(DOMAIN, None)
     snapshot.async_unload(hass)
+    notify_log.async_unload(hass)
     return True
 
 

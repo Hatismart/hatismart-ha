@@ -38,6 +38,12 @@ def _sign(key: bytes, camera: str, event: str, exp: int) -> str:
     return hmac.new(key, f"{camera}/{event}:{exp}".encode(), hashlib.sha256).hexdigest()[:32]
 
 
+async def sign_url(d, base: str, camera: str, event: str) -> str:
+    """camera = "n": ảnh thông báo đã lưu trên máy chủ (event = mã thông báo)"""
+    exp = int(time.time()) + TTL
+    return f"{base}/api/hatismart/snap/{camera}/{event}.jpg?exp={exp}&sig={_sign(await _secret(d), camera, event, exp)}"
+
+
 async def async_setup(hass: HomeAssistant) -> None:
     async def handle(call: ServiceCall) -> dict:
         d = hass.data.get(DOMAIN)
@@ -50,10 +56,7 @@ async def async_setup(hass: HomeAssistant) -> None:
                 base = get_url(hass, prefer_external=True)
             except NoURLAvailableError:
                 return {"url": ""}
-        exp = int(time.time()) + TTL
-        ev = event or "latest"
-        sig = _sign(await _secret(d), camera, ev, exp)
-        return {"url": f"{base}/api/hatismart/snap/{camera}/{ev}.jpg?exp={exp}&sig={sig}"}
+        return {"url": await sign_url(d, base, camera, event or "latest")}
 
     hass.services.async_register(
         DOMAIN, SERVICE, handle,
@@ -80,15 +83,21 @@ class SnapshotView(HomeAssistantView):
         except ValueError:
             exp = 0
         sig = request.query.get("sig", "")
-        if (d is None or not d.frigate.get("url") or not NAME.match(camera) or not NAME.match(event)
+        if (d is None or not NAME.match(camera) or not NAME.match(event)
                 or exp < time.time() or exp > time.time() + TTL + 60
                 or not hmac.compare_digest(sig, _sign(await _secret(d), camera, event, exp))):
             return web.Response(status=403)
+        if camera == "n":   # ảnh thông báo đã lưu
+            from . import notify_log
+            log = request.app["hass"].data.get(notify_log.KEY)
+            return await notify_log.image_response(request.app["hass"], log, event) if log else web.Response(status=404)
+        if not d.frigate.get("url"):
+            return web.Response(status=404)
         base, headers = d.frigate["url"], await d.frigate_headers()
         # sự kiện đang diễn ra có thể chưa có ảnh chụp → lấy ảnh nhỏ, cuối cùng là khung hình hiện tại
-        paths = [f"/api/events/{event}/snapshot.jpg?bbox=1&quality=80", f"/api/events/{event}/thumbnail.jpg"] \
+        paths = [f"/api/events/{event}/snapshot.jpg?bbox=1&h=480&quality=75", f"/api/events/{event}/thumbnail.jpg"] \
             if event != "latest" else []
-        paths.append(f"/api/{camera}/latest.jpg?h=720&quality=80")
+        paths.append(f"/api/{camera}/latest.jpg?height=480&quality=75")
         for p in paths:
             try:
                 async with d.session().get(base + p, headers=headers, timeout=ClientTimeout(total=8)) as r:
