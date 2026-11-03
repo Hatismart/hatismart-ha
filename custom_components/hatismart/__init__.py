@@ -19,7 +19,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 
-from . import go2rtc, mqtt_link, notify_log, snapshot
+from . import dali, go2rtc, mqtt_link, notify_log, snapshot
 from .const import DOMAIN, STORAGE_KEY, VERSION
 
 _LOGGER = logging.getLogger(__name__)
@@ -128,7 +128,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.http.register_view(snapshot.SnapshotView())
         hass.http.register_view(notify_log.NotificationsView())
         hass.http.register_view(notify_log.NotificationImageView())
-        for view in go2rtc.VIEWS:
+        for view in go2rtc.VIEWS + dali.VIEWS:
             hass.http.register_view(view())
         hass.data[f"{DOMAIN}_views"] = True
     return True
