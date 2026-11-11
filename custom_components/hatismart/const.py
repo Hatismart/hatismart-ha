@@ -1,3 +1,3 @@
 DOMAIN = "hatismart"
-VERSION = "1.9.0"
+VERSION = "1.13.0"
 STORAGE_KEY = "hatismart"
