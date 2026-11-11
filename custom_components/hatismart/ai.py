@@ -5,7 +5,8 @@ Messages: vilao.ai / OpenRouter / Anthropic) → trả về câu trả lời và
 quyền của chính người dùng rồi gửi kết quả về (vòng lặp nằm ở app, giống hàm đám mây aiChat).
 
 POST /api/hatismart/ai/chat   (xác thực HA của app)
-  Body: {context, history: "<chuỗi JSON>"|"", text? | toolResults?: [{tool_use_id, content, is_error?}], now?}
+  Body: {context, history: "<chuỗi JSON>"|"", text? | toolResults?: [{tool_use_id, content, is_error?}], now?, final?}
+  final (kèm toolResults): app đã tự viết câu xác nhận → cầu chỉ ghi vào lịch sử, không gọi AI (nhanh gấp đôi, 1.13.1)
   Trả về: {history: "<chuỗi JSON>", reply, toolCalls: [{id, name, input}], usage, costUSD, model, ms, remaining}
 GET  /api/hatismart/ai/chat   → {enabled, model} (app kiểm tra có dùng được không)
 
@@ -126,6 +127,14 @@ class AIChatView(HomeAssistantView):
         has_results = isinstance(results, list) and len(results) > 0
         if bool(has_text) == bool(has_results) or (has_text and len(text) > 2000):
             return self.json({"error": "bad_request"}, status_code=400)
+
+        # App đã tự viết câu xác nhận (mọi lệnh điều khiển thành công) → chỉ ghi vào lịch sử, không gọi AI, không trừ lượt
+        final = body.get("final")
+        if has_results and isinstance(final, str) and final.strip():
+            msgs = [*history, {"role": "user", "content": _tool_results(results)},
+                    {"role": "assistant", "content": [{"type": "text", "text": final.strip()[:500]}]}]
+            return self.json({"history": json.dumps(msgs, ensure_ascii=False), "reply": final.strip()[:500], "toolCalls": [],
+                              "usage": None, "costUSD": 0, "model": "local", "ms": 0})
 
         remaining = _take_quota(user.id if user else "?", int(cfg.get("daily_limit") or 200))
         if remaining is None:
